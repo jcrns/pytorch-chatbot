@@ -110,7 +110,7 @@ import codecs
 from io import open
 import itertools
 import math
-import sys
+
 
 USE_CUDA = torch.cuda.is_available()
 device = torch.device("cuda" if USE_CUDA else "cpu")
@@ -143,14 +143,13 @@ device = torch.device("cuda" if USE_CUDA else "cpu")
 corpus_name = "cornell movie-dialogs corpus"
 corpus = os.path.join("data", corpus_name)
 
-print(corpus)
 def printLines(file, n=10):
     with open(file, 'rb') as datafile:
         lines = datafile.readlines()
     for line in lines[:n]:
         print(line)
 
-# printLines(os.path.join(corpus, "movie_lines.txt"))
+printLines(os.path.join(corpus, "movie_lines.txt"))
 
 
 ######################################################################
@@ -171,10 +170,6 @@ def printLines(file, n=10):
 #    conversations
 #
 
-# Creating function that opens file and spliting by line breaks
-def read_lines(filename):
-    return open(filename).read().split('\n')[:-1]
-    
 # Splits each line of the file into a dictionary of fields
 def loadLines(fileName, fields):
     lines = {}
@@ -224,19 +219,6 @@ def extractSentencePairs(conversations):
     return qa_pairs
 
 
-def newExtractSentencePairs(sequences):
-    qa_pairs = []
-    raw_data_len = len(sequences)//2
-    for i in range(0, len(sequences), 2):
-        # Iterate over all the lines of the conversation
-            inputLine = sequences[i].strip()
-            targetLine = sequences[i+1].strip()
-            # Filter wrong samples (if one of the lists is empty)
-            if inputLine and targetLine:
-                qa_pairs.append([inputLine, targetLine])
-    return qa_pairs
-
-
 ######################################################################
 # Now we’ll call these functions and create the file. We’ll call it
 # *formatted_movie_lines.txt*.
@@ -257,33 +239,17 @@ MOVIE_CONVERSATIONS_FIELDS = ["character1ID", "character2ID", "movieID", "uttera
 
 # Load lines and process conversations
 print("\nProcessing corpus...")
-# lines = loadLines(os.path.join(corpus, "movie_lines.txt"), MOVIE_LINES_FIELDS)
+lines = loadLines(os.path.join(corpus, "movie_lines.txt"), MOVIE_LINES_FIELDS)
 print("\nLoading conversations...")
-
-# conversations = loadConversations(os.path.join(corpus, "movie_conversations.txt"),
-#                                   lines, MOVIE_CONVERSATIONS_FIELDS)
-
-reddit_scrap_convos = os.path.join(corpus, "train.txt")
-
-lines = read_lines(filename=reddit_scrap_convos)
-
-# Write new csv file
-# print("\nWriting newly formatted file...")
-# with open(datafile, 'w', encoding='utf-8') as outputfile:
-#     writer = csv.writer(outputfile, delimiter=delimiter, lineterminator='\n')
-#     for pair in extractSentencePairs(conversations):
-#         print("pair\n\n\n\n")
-#         print(pair)
-#         break
-#         writer.writerow(pair)
+conversations = loadConversations(os.path.join(corpus, "movie_conversations.txt"),
+                                  lines, MOVIE_CONVERSATIONS_FIELDS)
 
 # Write new csv file
 print("\nWriting newly formatted file...")
 with open(datafile, 'w', encoding='utf-8') as outputfile:
     writer = csv.writer(outputfile, delimiter=delimiter, lineterminator='\n')
-    for pair in newExtractSentencePairs(lines):
+    for pair in extractSentencePairs(conversations):
         writer.writerow(pair)
-
 
 # Print a sample of lines
 print("\nSample lines from file:")
@@ -1296,15 +1262,11 @@ batch_size = 64
 # Set checkpoint to load from; set to None if starting from scratch
 loadFilename = None
 checkpoint_iter = 4000
-
-# Comment out for train
-# loadFilename = os.path.join(save_dir, model_name, corpus_name,
+#loadFilename = os.path.join(save_dir, model_name, corpus_name,
 #                            '{}-{}_{}'.format(encoder_n_layers, decoder_n_layers, hidden_size),
 #                            '{}_checkpoint.tar'.format(checkpoint_iter))
 
 
-print("loadFilename")
-print(loadFilename)
 # Load model if a loadFilename is provided
 if loadFilename:
     # If loading on same machine the model was trained on
@@ -1372,12 +1334,12 @@ if loadFilename:
 for state in encoder_optimizer.state.values():
     for k, v in state.items():
         if isinstance(v, torch.Tensor):
-            state[k] = v
+            state[k] = v.cuda()
 
 for state in decoder_optimizer.state.values():
     for k, v in state.items():
         if isinstance(v, torch.Tensor):
-            state[k] = v
+            state[k] = v.cuda()
     
 # Run training iterations
 print("Starting Training!")
@@ -1400,14 +1362,8 @@ decoder.eval()
 # Initialize search module
 searcher = GreedySearchDecoder(encoder, decoder)
 
-print('size of objects')
-print(sys.getsizeof(encoder))
-print(sys.getsizeof(decoder))
-print(sys.getsizeof(searcher))
-print(sys.getsizeof(voc))
-
 # Begin chatting (uncomment and run the following line to begin)
-evaluateInput(encoder, decoder, searcher, voc)
+# evaluateInput(encoder, decoder, searcher, voc)
 
 
 ######################################################################
